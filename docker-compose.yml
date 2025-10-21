@@ -10,6 +10,7 @@ services:
       - RAIS_IIIFURL=http://${HOST}:8080/iiif
       - RAIS_TILEPATH=/var/local/images
       - RAIS_TILECACHELEN=10000
+      - RAIS_LOGLEVEL=WARN
     volumes:
       - ${DATA_PATH}data/Delivery:/var/local/images:ro,Z
     expose:

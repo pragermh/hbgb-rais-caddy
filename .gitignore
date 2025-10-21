@@ -1,0 +1,13 @@
+.env
+__pycache__/
+venv/
+
+# macOS system files
+.DS_Store
+
+# Ignore images
+# Re-include
+!images/dir1/
+!images/dir1/*.jp2
+!images/dir2/
+!images/dir2/*.jp2

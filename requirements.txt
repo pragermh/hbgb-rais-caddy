@@ -1,0 +1,2 @@
+# Python packages needed for helper scripts
+python-dotenv>=1.0

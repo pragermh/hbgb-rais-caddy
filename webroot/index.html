@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Herbarium GB Image Viewer</title>
+
+  <!-- OpenSeadragon -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/openseadragon/4.0.0/openseadragon.min.js"></script>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Roboto&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      background-color: #000;
+      color: #4CAF50;
+      font-family: 'Roboto', sans-serif;
+      margin: 2rem;
+      line-height: 1.5;
+      text-align: center;
+    }
+
+    h1 {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+
+    #openseadragon {
+      width: 90vw;
+      height: 70vh;
+      margin: 1rem auto 2rem auto;
+      border: 2px solid #4CAF50;
+      border-radius: 10px;
+      box-shadow: 0 0 20px rgba(76, 175, 80, 0.7);
+    }
+
+    footer {
+      margin-top: 3rem;
+      font-size: 0.9rem;
+      color: #777;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+
+  <h1 id="pageTitle">Herbarium GB Image Viewer</h1>
+  <div id="openseadragon"></div>
+  <footer>
+    &copy; 2025 Herbarium GB
+  </footer>
+  <script>
+    function getIdFromPath() {
+      const p = location.pathname.replace(/^\/+|\/+$/g, '');
+      return p || 'GB-0998621';
+    }
+
+    const imageId = getIdFromPath();
+    const IIIF_ROOT = '/iiif';
+    const SHARD_PREFIX_LEN = 7;
+
+    async function resolveJp2Base(id) {
+      const shard = id.slice(0, SHARD_PREFIX_LEN);
+      const url = `/idx/${shard}.json`;
+      console.log("Fetching shard:", url);
+      const resp = await fetch(url, { cache: 'force-cache' });
+      console.log("Shard status:", resp.status);
+      if (!resp.ok) throw new Error(`Index missing for shard ${shard}`);
+      const map = await resp.json();
+      const rel = map[id];
+      console.log("Resolved directory:", rel);
+      if (!rel) throw new Error(`ID ${id} not found in shard ${shard}`);
+      return `${IIIF_ROOT}/${rel}/${id}.jp2`;
+    }
+
+    document.getElementById('pageTitle').innerHTML =
+      `Herbarium GB Image Viewer<br><span style="font-size:1.5rem;color:#ccc">${imageId}</span>`;
+
+    (async () => {
+      try {
+        const jp2Base = await resolveJp2Base(imageId);
+        const infoUrl = `${jp2Base}/info.json`;
+        console.log("IIIF info URL:", infoUrl);
+
+        OpenSeadragon({
+          id: "openseadragon",
+          prefixUrl: "https://cdnjs.cloudflare.com/ajax/libs/openseadragon/4.0.0/images/",
+          showNavigator: true,
+          navigatorPosition: 'BOTTOM_RIGHT',
+          // Helps prevent CORS issues if your IIIF server sends ACAO headers
+          crossOriginPolicy: "Anonymous",
+          tileSources: infoUrl
+        });
+      } catch (e) {
+        console.error(e);
+        alert('Could not resolve image location (index).');
+      }
+    })();
+  </script>
+</body>
+</html>

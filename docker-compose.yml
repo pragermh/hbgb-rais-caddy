@@ -1,0 +1,25 @@
+services:
+  rais:
+    image: uolibraries/rais:latest
+    container_name: rais
+    env_file:
+      - .env
+    environment:
+      - RAIS_ADDRESS=:12415
+      - RAIS_IIIFURL=http://${HOST}:8080/iiif
+      - RAIS_TILEPATH=/var/local/images
+    volumes:
+      - ${DATA_PATH}data/Delivery:/var/local/images:ro,Z
+    expose:
+      - "12415"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    depends_on:
+      - rais
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro,Z
+      - ./webroot:/srv/www:ro

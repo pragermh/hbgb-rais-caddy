@@ -25,26 +25,22 @@
       font-size: 2.5rem;
       margin-bottom: 1rem;
     }
-    #subTitle {
-      font-size: 1.5rem;
-      color: #ccc;
-    }
+    #subTitle { font-size: 1.5rem; color: #ccc; }
     #openseadragon {
       width: 90vw;
       height: 70vh;
-      margin: 1rem auto 1rem auto;
+      margin: 1rem auto;
       border: 2px solid #4CAF50;
       border-radius: 10px;
-      overflow:hidden;
+      overflow: hidden;
       box-shadow: 0 0 20px rgba(76, 175, 80, 0.7);
     }
-
     .dl-bar {
       display: flex;
       gap: .75rem;
       justify-content: center;
       align-items: center;
-      margin: 0 auto 2rem auto;
+      margin: 0 auto 2rem;
       flex-wrap: wrap;
       max-width: 90vw;
     }
@@ -60,19 +56,9 @@
       font-weight: 700;
       letter-spacing: .2px;
     }
-    .btn:hover {
-      background-color: #4CAF50;
-      color: #000;
-      transform: translateY(-1px);
-    }
+    .btn:hover { background-color: #4CAF50; color: #000; transform: translateY(-1px); }
     .btn:active { transform: translateY(0); }
-
-    footer {
-      margin-top: 3rem;
-      font-size: 0.9rem;
-      color: #777;
-      font-style: italic;
-    }
+    footer { margin-top: 3rem; font-size: .9rem; color: #777; font-style: italic; }
   </style>
 </head>
 <body>
@@ -84,7 +70,7 @@
 
   <div id="openseadragon"></div>
 
-  <!-- Buttons (no hrefs → no tooltip URLs) -->
+  <!-- Download buttons -->
   <div class="dl-bar" id="dlBar" style="display:none;">
     <button id="dlSmall" class="btn">⬇ Small JPEG</button>
     <button id="dlFull"  class="btn">⬇ Large JPEG</button>
@@ -95,113 +81,97 @@
   </footer>
 
   <script>
-    // Extract ID from URL path
-    function getIdFromPath() {
-      const p = location.pathname.replace(/^\/+|\/+$/g, '');
-      return p || 'GB-0998621';
-    }
-
-    const imageId = getIdFromPath();
+    // ----- Shorthands / constants -----
+    const $ = id => document.getElementById(id);
     const IIIF_ROOT = '/iiif';
     const SHARD_PREFIX_LEN = 7;
 
-    function setSubtitleOk(id) {
-      document.getElementById('subTitle').textContent = id;
-    }
+    // ----- ID parsing & validation -----
+    const pathId = location.pathname.replace(/^\/+|\/+$/g, ''); // no default
+    const hasId = !!pathId;
+    const isValidGbId = id => /^GB-\d{7}$/.test(id);
 
-    function setSubtitleNotFound(id) {
-      document.getElementById('subTitle').textContent = `${id} not found`;
-      document.getElementById('openseadragon').innerHTML = '';
-      document.getElementById('dlBar').style.display = 'none';
-    }
+    // ----- UI helpers -----
+    const setSubtitle = text => { $('subTitle').textContent = text; };
+    const clearViewer = () => { $('openseadragon').replaceChildren(); $('dlBar').style.display = 'none'; };
+    const showNoId = () => { setSubtitle('No QR code ID given'); clearViewer(); };
+    const showGenericNotFound = () => { setSubtitle('Requested QR code ID not found'); clearViewer(); };
+    const showIdNotFound = id => { setSubtitle(`${id} not found`); clearViewer(); };
+    const showOk = id => { setSubtitle(id); };
 
-    // Fetch shard JSON and get relative path
-    async function resolveRelAndBase(id) {
-      const shard = id.slice(0, SHARD_PREFIX_LEN);
-      const url = `/idx/${shard}.json`;
-      const resp = await fetch(url, { cache: 'force-cache' });
-      if (!resp.ok) throw new Error('Index missing');
-      const map = await resp.json();
-      const rel = map[id];
-      if (!rel) throw new Error('ID not in index');
-      return { rel, jp2Base: `${IIIF_ROOT}/${rel}/${id}.jp2` };
-    }
-
-    // HEAD check for info.json
-    async function head(url, { timeout = 6000 } = {}) {
+    // ----- Network helpers -----
+    async function headOk(url, timeout = 6000) {
       const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), timeout);
+      const timer = setTimeout(() => ctrl.abort(), timeout);
       try {
-        return await fetch(url, { method: 'HEAD', signal: ctrl.signal, cache: 'no-store' });
-      } finally {
-        clearTimeout(t);
-      }
+        const r = await fetch(url, { method: 'HEAD', signal: ctrl.signal, cache: 'no-store' });
+        return r.ok;
+      } catch { return false; }
+      finally { clearTimeout(timer); }
     }
 
-    // Fetch→Blob→download — hides true URL
     async function downloadViaBlob(url, filename) {
       try {
-        const resp = await fetch(url, { cache: 'no-store' });
-        if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
-        const blob = await resp.blob();
-        const blobUrl = URL.createObjectURL(blob);
+        const r = await fetch(url, { cache: 'no-store' });
+        if (!r.ok) throw new Error(`Download failed: ${r.status}`);
+        const blob = await r.blob();
+        const u = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(blobUrl);
+        a.href = u; a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(u);
       } catch (e) {
         console.error('Download error', e);
         alert('Download failed. Please try again.');
       }
     }
 
-    function setupButtons(jp2Base, id) {
-      const smallUrl = `${jp2Base}/full/1200,/0/default.jpg`;
-      const fullUrl  = `${jp2Base}/full/full/0/default.jpg`;
+    // ----- Flow -----
+    if (!hasId) {
+      showNoId();
+    } else if (!isValidGbId(pathId)) {
+      showGenericNotFound();
+    } else {
+      const imageId = pathId;
+      showOk(imageId);
 
-      const btnSmall = document.getElementById('dlSmall');
-      const btnFull  = document.getElementById('dlFull');
-
-      btnSmall.onclick = () => downloadViaBlob(smallUrl, `${id}-small.jpg`);
-      btnFull.onclick  = () => downloadViaBlob(fullUrl, `${id}-large.jpg`);
-
-      document.getElementById('dlBar').style.display = 'flex';
-    }
-
-    setSubtitleOk(imageId);
-
-    (async () => {
-      try {
-        const { rel, jp2Base } = await resolveRelAndBase(imageId);
-        const infoUrl = `${jp2Base}/info.json`;
-
+      (async () => {
         try {
-          const r = await head(infoUrl);
-          if (!r.ok && r.status === 404) {
-            setSubtitleNotFound(imageId);
-            return;
-          }
-        } catch {}
+          // index lookup
+          const shard = imageId.slice(0, SHARD_PREFIX_LEN);
+          const idxUrl = `/idx/${shard}.json`;
+          const resp = await fetch(idxUrl, { cache: 'force-cache' });
+          if (!resp.ok) throw new Error('Index missing');
 
-        OpenSeadragon({
-          id: "openseadragon",
-          prefixUrl: "https://cdnjs.cloudflare.com/ajax/libs/openseadragon/4.0.0/images/",
-          showNavigator: true,
-          navigatorPosition: 'BOTTOM_RIGHT',
-          crossOriginPolicy: "Anonymous",
-          tileSources: infoUrl
-        }).addHandler('open-failed', () => {
-          setSubtitleNotFound(imageId);
-        });
+          const map = await resp.json();
+          const rel = map[imageId];
+          if (!rel) { showIdNotFound(imageId); return; }
 
-        setupButtons(jp2Base, imageId);
-      } catch {
-        setSubtitleNotFound(imageId);
-      }
-    })();
+          const jp2Base = `${IIIF_ROOT}/${rel}/${imageId}.jp2`;
+          const infoUrl = `${jp2Base}/info.json`;
+          if (!(await headOk(infoUrl))) { showIdNotFound(imageId); return; }
+
+          // viewer
+          OpenSeadragon({
+            id: 'openseadragon',
+            prefixUrl: 'https://cdnjs.cloudflare.com/ajax/libs/openseadragon/4.0.0/images/',
+            showNavigator: true,
+            navigatorPosition: 'BOTTOM_RIGHT',
+            crossOriginPolicy: 'Anonymous',
+            tileSources: infoUrl
+          }).addHandler('open-failed', () => { showIdNotFound(imageId); });
+
+          // downloads
+          const smallUrl = `${jp2Base}/full/1200,/0/default.jpg`;
+          const fullUrl  = `${jp2Base}/full/full/0/default.jpg`;
+          $('dlSmall').onclick = () => downloadViaBlob(smallUrl, `${imageId}-small.jpg`);
+          $('dlFull').onclick  = () => downloadViaBlob(fullUrl,  `${imageId}-large.jpg`);
+          $('dlBar').style.display = 'flex';
+        } catch {
+          showIdNotFound(pathId); // valid format, but something failed
+        }
+      })();
+    }
   </script>
 
 </body>

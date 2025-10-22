@@ -19,27 +19,52 @@
       line-height: 1.5;
       text-align: center;
     }
-
     h1 {
       font-family: 'Montserrat', sans-serif;
       font-weight: 700;
       font-size: 2.5rem;
       margin-bottom: 1rem;
     }
-
     #subTitle {
       font-size: 1.5rem;
       color: #ccc;
     }
-
     #openseadragon {
       width: 90vw;
       height: 70vh;
-      margin: 1rem auto 2rem auto;
+      margin: 1rem auto 1rem auto;
       border: 2px solid #4CAF50;
       border-radius: 0px;
       box-shadow: 0 0 20px rgba(76, 175, 80, 0.7);
     }
+
+    /* Download buttons */
+    .dl-bar {
+      display: flex;
+      gap: .75rem;
+      justify-content: center;
+      align-items: center;
+      margin: 0 auto 2rem auto;
+      flex-wrap: wrap;
+      max-width: 90vw;
+    }
+    .btn {
+      display: inline-block;
+      padding: .65rem 1rem;
+      border: 2px solid #4CAF50;
+      color: #4CAF50;
+      text-decoration: none;
+      border-radius: 6px;
+      transition: transform .05s ease, background-color .2s ease, color .2s ease;
+      font-weight: 700;
+      letter-spacing: .2px;
+    }
+    .btn:hover {
+      background-color: #4CAF50;
+      color: #000;
+      transform: translateY(-1px);
+    }
+    .btn:active { transform: translateY(0); }
 
     footer {
       margin-top: 3rem;
@@ -58,6 +83,12 @@
 
   <div id="openseadragon"></div>
 
+  <!-- Download buttons -->
+  <div class="dl-bar" id="dlBar" style="display:none;">
+    <a id="dlSmall" class="btn" href="#" download>⬇ Small JPEG</a>
+    <a id="dlFull"  class="btn" href="#" download>⬇ Large JPEG</a>
+  </div>
+
   <footer>
     &copy; 2025 Herbarium GB
   </footer>
@@ -73,17 +104,16 @@
     const IIIF_ROOT = '/iiif';
     const SHARD_PREFIX_LEN = 7;
 
-    // Set normal subtitle
     function setSubtitleOk(id) {
       const sub = document.getElementById('subTitle');
       sub.textContent = id;
     }
 
-    // Set "not found" subtitle
     function setSubtitleNotFound(id) {
       const sub = document.getElementById('subTitle');
       sub.textContent = `${id} not found`;
-      document.getElementById('openseadragon').innerHTML = ''; // clear viewer
+      document.getElementById('openseadragon').innerHTML = '';
+      document.getElementById('dlBar').style.display = 'none';
     }
 
     // Resolve image path from index shard
@@ -117,6 +147,27 @@
       }
     }
 
+    // Build IIIF URLs and show buttons
+    function setDownloadLinks(jp2Base, id) {
+      const smallSize = '1200,';  // adjust as desired
+      const fullSize  = 'full';   // use 'max' for IIIF v3
+
+      const smallUrl = `${jp2Base}/full/${smallSize}/0/default.jpg?dl=1&fn=${encodeURIComponent(id)}-small.jpg`;
+      const fullUrl  = `${jp2Base}/full/${fullSize}/0/default.jpg?dl=1&fn=${encodeURIComponent(id)}-large.jpg`;
+
+      const dlBar = document.getElementById('dlBar');
+      const aSmall = document.getElementById('dlSmall');
+      const aFull  = document.getElementById('dlFull');
+
+      aSmall.href = smallUrl;
+      aFull.href  = fullUrl;
+
+      aSmall.setAttribute('download', `${id}-small.jpg`);
+      aFull.setAttribute('download', `${id}-large.jpg`);
+
+      dlBar.style.display = 'flex';
+    }
+
     // Initial subtitle
     setSubtitleOk(imageId);
 
@@ -125,7 +176,6 @@
         const jp2Base = await resolveJp2Base(imageId);
         const infoUrl = `${jp2Base}/info.json`;
 
-        // Optional: quick check before viewer load
         try {
           const r = await head(infoUrl);
           if (!r.ok && r.status === 404) {
@@ -133,7 +183,7 @@
             return;
           }
         } catch {
-          // Ignore network/timeout, let viewer try
+          // ignore network errors
         }
 
         // Create viewer
@@ -148,8 +198,10 @@
           setSubtitleNotFound(imageId);
         });
 
+        // Set download links
+        setDownloadLinks(jp2Base, imageId);
+
       } catch (e) {
-        // Missing index or ID not found
         setSubtitleNotFound(imageId);
       }
     })();

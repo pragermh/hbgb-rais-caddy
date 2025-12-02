@@ -26,6 +26,7 @@
       margin-bottom: 1rem;
     }
     #subTitle { font-size: 1.5rem; color: #ccc; }
+
     #openseadragon {
       width: 90vw;
       height: 70vh;
@@ -34,7 +35,11 @@
       border-radius: 10px;
       overflow: hidden;
       box-shadow: 0 0 20px rgba(76, 175, 80, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
+
     .dl-bar {
       display: flex;
       gap: .75rem;
@@ -44,6 +49,7 @@
       flex-wrap: wrap;
       max-width: 90vw;
     }
+
     .btn {
       display: inline-block;
       padding: .65rem 1rem;
@@ -58,6 +64,18 @@
     }
     .btn:hover { background-color: #4CAF50; color: #000; transform: translateY(-1px); }
     .btn:active { transform: translateY(0); }
+
+    .error-box {
+      background: rgba(255, 0, 0, 0.12);
+      border-left: 5px solid #ff4a4a;
+      border-radius: 6px;
+      padding: 1rem 1.5rem;
+      max-width: 650px;
+      margin: 0 auto;
+      color: #ffaaaa;
+      font-size: 1.2rem;
+    }
+
     footer { margin-top: 3rem; font-size: .9rem; color: #777; font-style: italic; }
   </style>
 </head>
@@ -81,77 +99,142 @@
   </footer>
 
   <script>
-    // ----- Shorthands / constants -----
+    // ----- Constants -----
     const $ = id => document.getElementById(id);
     const IIIF_ROOT = '/iiif';
     const SHARD_PREFIX_LEN = 7;
 
-    // ----- ID parsing & validation -----
-    const pathId = location.pathname.replace(/^\/+|\/+$/g, ''); // no default
+    // ID parsing
+    const pathId = location.pathname.replace(/^\/+|\/+$/g, '');
     const hasId = !!pathId;
     const isValidGbId = id => /^GB-\d{7}$/.test(id);
 
     // ----- UI helpers -----
     const setSubtitle = text => { $('subTitle').textContent = text; };
-    const clearViewer = () => { $('openseadragon').replaceChildren(); $('dlBar').style.display = 'none'; };
-    const showNoId = () => { setSubtitle('No QR code ID given'); clearViewer(); };
-    const showGenericNotFound = () => { setSubtitle('Requested QR code ID not found'); clearViewer(); };
-    const showIdNotFound = id => { setSubtitle(`${id} not found`); clearViewer(); };
-    const showOk = id => { setSubtitle(id); };
+    const clearViewer = () => {
+      $('openseadragon').innerHTML = "";
+      $('dlBar').style.display = 'none';
+    };
 
-    // ----- Network helpers -----
-    async function headOk(url, timeout = 6000) {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), timeout);
-      try {
-        const r = await fetch(url, { method: 'HEAD', signal: ctrl.signal, cache: 'no-store' });
-        return r.ok;
-      } catch { return false; }
-      finally { clearTimeout(timer); }
-    }
+    // ----- Error-display inside viewer -----
+    const showError = (code, id) => {
+      clearViewer();
 
+      const config = {
+        no_id: {
+          title: "No Image ID Provided",
+          message: "No QR code or specimen ID was given in the address."
+        },
+        invalid_id: {
+          title: "Invalid Image ID",
+          message: id
+            ? `“${id}” is not a valid Herbarium GB image ID.`
+            : "The supplied value is not a valid Herbarium GB image ID."
+        },
+        id_not_found: {
+          title: "Image Not Found",
+          message: id
+            ? `No image could be found for ID “${id}”.`
+            : "The requested image does not exist."
+        },
+        rais_down: {
+          title: "Image Server Unavailable",
+          message: "The RAIS image server is currently offline or unreachable."
+        },
+        system: {
+          title: "Viewer Service Unavailable",
+          message: "The viewer encountered an unexpected error."
+        }
+      };
+
+      const cfg = config[code] || config.system;
+
+      setSubtitle(cfg.title);
+      const box = document.createElement('div');
+      box.className = 'error-box';
+      box.textContent = cfg.message;
+      $('openseadragon').appendChild(box);
+    };
+
+    // ----- Downloads -----
     async function downloadViaBlob(url, filename) {
       try {
         const r = await fetch(url, { cache: 'no-store' });
-        if (!r.ok) throw new Error(`Download failed: ${r.status}`);
+        if (!r.ok) throw new Error(`Download failed ${r.status}`);
         const blob = await r.blob();
-        const u = URL.createObjectURL(blob);
+        const tmp = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = u; a.download = filename;
+        a.href = tmp; a.download = filename;
         document.body.appendChild(a); a.click(); a.remove();
-        URL.revokeObjectURL(u);
+        URL.revokeObjectURL(tmp);
       } catch (e) {
         console.error('Download error', e);
-        alert('Download failed. Please try again.');
       }
     }
 
     // ----- Flow -----
     if (!hasId) {
-      showNoId();
+      showError('no_id');
     } else if (!isValidGbId(pathId)) {
-      showGenericNotFound();
+      showError('invalid_id', pathId);
     } else {
       const imageId = pathId;
-      showOk(imageId);
+      setSubtitle(imageId);
 
       (async () => {
         try {
-          // index lookup
+          // Lookup index shard
           const shard = imageId.slice(0, SHARD_PREFIX_LEN);
           const idxUrl = `/idx/${shard}.json`;
-          const resp = await fetch(idxUrl, { cache: 'force-cache' });
-          if (!resp.ok) throw new Error('Index missing');
+
+          let resp;
+          try {
+            resp = await fetch(idxUrl, { cache: 'force-cache' });
+          } catch (e) {
+            console.error("Index fetch failed", e);
+            showError('system', imageId);
+            return;
+          }
+
+          if (!resp.ok) {
+            if (resp.status === 404) {
+              showError('id_not_found', imageId);
+              return;
+            }
+            showError('system', imageId);
+            return;
+          }
 
           const map = await resp.json();
           const rel = map[imageId];
-          if (!rel) { showIdNotFound(imageId); return; }
+          if (!rel) {
+            showError('id_not_found', imageId);
+            return;
+          }
 
           const jp2Base = `${IIIF_ROOT}/${rel}/${imageId}.jp2`;
           const infoUrl = `${jp2Base}/info.json`;
-          // if (!(await headOk(infoUrl))) { showIdNotFound(imageId); return; }
 
-          // viewer
+          // HEAD check for IIIF availability
+          try {
+            const headResp = await fetch(infoUrl, { method: 'HEAD', cache: 'no-store' });
+
+            if (!headResp.ok) {
+              if (headResp.status === 404) {
+                showError('id_not_found', imageId);
+                return;
+              }
+              console.error("IIIF backend error:", headResp.status);
+              showError('rais_down', imageId);
+              return;
+            }
+          } catch (e) {
+            console.error('HEAD info.json failed', e);
+            showError('rais_down', imageId);
+            return;
+          }
+
+          // Initialize viewer
           OpenSeadragon({
             id: 'openseadragon',
             prefixUrl: 'https://cdnjs.cloudflare.com/ajax/libs/openseadragon/4.0.0/images/',
@@ -159,16 +242,22 @@
             navigatorPosition: 'BOTTOM_RIGHT',
             crossOriginPolicy: 'Anonymous',
             tileSources: infoUrl
-          }).addHandler('open-failed', () => { showIdNotFound(imageId); });
+          }).addHandler('open-failed', () => {
+            showError('id_not_found', imageId);
+          });
 
-          // downloads
+          // Download buttons
           const smallUrl = `${jp2Base}/full/1200,/0/default.jpg`;
           const fullUrl  = `${jp2Base}/full/full/0/default.jpg`;
+
           $('dlSmall').onclick = () => downloadViaBlob(smallUrl, `${imageId}-small.jpg`);
           $('dlFull').onclick  = () => downloadViaBlob(fullUrl,  `${imageId}-large.jpg`);
+
           $('dlBar').style.display = 'flex';
-        } catch {
-          showIdNotFound(pathId); // valid format, but something failed
+
+        } catch (e) {
+          console.error("Viewer flow failed", e);
+          showError('system', pathId);
         }
       })();
     }

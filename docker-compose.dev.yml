@@ -1,0 +1,9 @@
+services:
+  caddy:
+    ports:
+      - "8080:80"   # webroot-stack, via Caddy :80
+      - "8081:81"   # webroot2-stack, via Caddy :81
+    volumes:
+      - ./Caddyfile.dev:/etc/caddy/Caddyfile:ro
+      - ./webroot:/srv:ro
+      - ./webroot2:/srv2:ro

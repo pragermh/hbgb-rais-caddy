@@ -1,0 +1,69 @@
+{
+    auto_https off
+}
+
+# Dev-stack for rais + webroot
+:80 {
+    root * /srv
+    encode gzip
+
+    @health path /health
+    handle @health {
+        header Content-Type text/plain
+        respond "ok\n" 200
+    }
+
+    handle /iiif* {
+        reverse_proxy rais:12415 {
+            header_up Host {hostport}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    @static path_regexp static ^/(idx/|assets/|favicon\.ico$|robots\.txt$)
+    handle @static {
+        try_files {path} {path}/index.html
+        header Cache-Control "public, max-age=604800, immutable"
+        file_server
+    }
+
+    handle {
+        try_files {path} /index.html
+        file_server
+    }
+}
+
+# Dev-stack for rais2 + webroot2
+:81 {
+    root * /srv2
+    encode gzip
+
+    @health path /health
+    handle @health {
+        header Content-Type text/plain
+        respond "ok\n" 200
+    }
+
+    handle /iiif* {
+        reverse_proxy rais2:12415 {
+            header_up Host {hostport}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    @static path_regexp static ^/(idx/|assets/|favicon\.ico$|robots\.txt$)
+    handle @static {
+        try_files {path} {path}/index.html
+        header Cache-Control "public, max-age=604800, immutable"
+        file_server
+    }
+
+    handle {
+        try_files {path} /index.html
+        file_server
+    }
+}

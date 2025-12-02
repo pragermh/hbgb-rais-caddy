@@ -1,28 +1,98 @@
 {
-	log {
-		level warn
-		output stdout
-		format console
-	}
+    # Optional: Let's Encrypt contact email
+    # email you@example.com
 }
-:8080 {
-	encode gzip zstd
 
-	# Route A: proxy /iiif/* to RAIS (exclusive)
-	@iiif path /iiif/*
-	handle @iiif {
-		reverse_proxy rais:12415
-	}
+botmus-dev.it.gu.se {
+    root * /srv
+    encode gzip
 
-	# Route B: static + SPA fallback for everything else
-	handle {
-		root * /srv/www
-		try_files {path} /index.html
-		file_server
-	}
+    # --- /health endpoint ---
+    @health path /health
+    handle @health {
+        header Content-Type text/plain
+        respond "ok\n" 200
+    }
 
-	# Optional: long cache for shard JSON
-	@idx path /idx/*
-	header @idx Cache-Control "public, max-age=31536000, immutable"
-	header @idx Content-Type "application/json; charset=utf-8"
+    # --- IIIF proxy: ^~ /iiif/ ---
+    handle /iiif* {
+        reverse_proxy rais:12415 {
+            # like: proxy_set_header Host $host:$server_port;
+            header_up Host {hostport}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # --- Static /idx, /assets, favicon, robots.txt with caching ---
+    @static path_regexp static ^/(idx/|assets/|favicon\.ico$|robots\.txt$)
+    handle @static {
+        # Similar to: try_files $uri =404;
+        try_files {path} {path}/index.html
+        # If nothing matches, Caddy returns 404 automatically
+
+        header Cache-Control "public, max-age=604800, immutable"
+        file_server
+    }
+
+    # --- SPA fallback for everything else (location /) ---
+    handle {
+        # Like: try_files $uri /index.html;
+        try_files {path} /index.html
+        file_server
+    }
+
+    log {
+        level warn
+        output stdout
+        format console
+    }
+}
+
+botnode.it.gu.se {
+    root * /srv2
+    encode gzip
+
+    # --- /health endpoint ---
+    @health path /health
+    handle @health {
+        header Content-Type text/plain
+        respond "ok\n" 200
+    }
+
+    # --- IIIF proxy: ^~ /iiif/ ---
+    handle /iiif* {
+        reverse_proxy rais2:12415 {
+            # like: proxy_set_header Host $host:$server_port;
+            header_up Host {hostport}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # --- Static /idx, /assets, favicon, robots.txt with caching ---
+    @static path_regexp static ^/(idx/|assets/|favicon\.ico$|robots\.txt$)
+    handle @static {
+        # Similar to: try_files $uri =404;
+        try_files {path} {path}/index.html
+        # If nothing matches, Caddy returns 404 automatically
+
+        header Cache-Control "public, max-age=604800, immutable"
+        file_server
+    }
+
+    # --- SPA fallback for everything else (location /) ---
+    handle {
+        # Like: try_files $uri /index.html;
+        try_files {path} /index.html
+        file_server
+    }
+
+    log {
+        level warn
+        output stdout
+        format console
+    }
 }

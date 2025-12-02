@@ -22,11 +22,27 @@ DC = docker compose $(COMPOSE_FILES)
 
 # Start everything (dev: both stacks, prod: full stack)
 up:
-	$(DC) up
+	$(DC) up -d
+
+# Start only "webroot" stack (rais + Caddy)
+up1:
+	$(DC) up caddy rais
+
+# Start only "webroot2" stack (rais2 + Caddy)
+up2:
+	$(DC) up caddy rais2
 
 # Stop everything
 down:
 	$(DC) down
+
+# Stop only rais
+down1:
+	$(DC) stop rais
+
+# Stop only rais2
+down2:
+	$(DC) stop rais2
 
 # Follow logs
 logs:
@@ -36,10 +52,6 @@ logs:
 rebuild:
 	$(DC) up --build
 
-# Start only "webroot" stack (rais + Caddy)
-up1:
-	$(DC) up caddy rais
-
-# Start only "webroot2" stack (rais2 + Caddy)
-up2:
-	$(DC) up caddy rais2
+# Show running containers
+ps:
+	$(DC) ps

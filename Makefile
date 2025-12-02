@@ -20,27 +20,19 @@ DC = docker compose $(COMPOSE_FILES)
 # Commands
 # ----------------------------------------------
 
-# Start everything (dev: both stacks, prod: full stack)
+# Start prod
 up:
-	$(DC) up -d
+	$(DC) up caddy rais -d
 
-# Start only "webroot" stack (rais + Caddy)
-up1:
-	$(DC) up caddy rais
-
-# Start only "webroot2" stack (rais2 + Caddy)
+# Start test also
 up2:
-	$(DC) up caddy rais2
+	$(DC) up rais2 -d
 
 # Stop everything
 down:
 	$(DC) down
 
-# Stop only rais
-down1:
-	$(DC) stop rais
-
-# Stop only rais2
+# Stop test
 down2:
 	$(DC) stop rais2
 

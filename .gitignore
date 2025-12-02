@@ -13,4 +13,3 @@ certs/*
 # Keep
 !webroot/idx/.gitkeep
 !webroot2/idx/.gitkeep
-!certs/.gitkeep

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Error – Herbarium GB Viewer</title>
+
+  <style>
+    body {
+      background-color: #000;
+      color: #4CAF50;
+      font-family: 'Roboto', sans-serif;
+      margin: 0;
+      padding: 2rem;
+      text-align: center;
+      line-height: 1.6;
+    }
+    h1 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      color: #4CAF50;
+      text-shadow: 0 0 12px rgba(76, 175, 80, 0.7);
+    }
+    p {
+      font-size: 1.2rem;
+      color: #ccc;
+      max-width: 650px;
+      margin: 0.5rem auto 2rem;
+    }
+    .error-box {
+      background: rgba(255, 0, 0, 0.12);
+      border-left: 5px solid #ff4a4a;
+      border-radius: 6px;
+      padding: 1rem 1.5rem;
+      max-width: 650px;
+      margin: 2rem auto;
+      color: #ffaaaa;
+      font-size: 1.2rem;
+    }
+    .btn {
+      display: inline-block;
+      padding: 0.75rem 1.5rem;
+      margin-top: 1.5rem;
+      border: 2px solid #4CAF50;
+      color: #4CAF50;
+      background: transparent;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.2s ease;
+      text-decoration: none;
+    }
+    .btn:hover {
+      background-color: #4CAF50;
+      color: #000;
+      transform: translateY(-2px);
+    }
+    footer {
+      margin-top: 3rem;
+      color: #666;
+      font-size: 0.9rem;
+      font-style: italic;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>Something Went Wrong</h1>
+  <p>
+    The Herbarium GB Image Viewer could not load the requested image.
+  </p>
+
+  <div class="error-box" id="errorMessage">
+    <!-- Filled dynamically if you want -->
+    The RAIS image server appears to be <strong>offline</strong> or unreachable.
+  </div>
+
+  <a href="/" class="btn">Return to Viewer</a>
+
+  <footer>
+    &copy; 2025 Herbarium GB · System Error Page
+  </footer>
+
+  <script>
+    // Optional: allow passing ?msg=something to override the message
+    const params = new URLSearchParams(location.search);
+    const msg = params.get("msg");
+    if (msg) {
+      document.getElementById("errorMessage").innerHTML = msg;
+    }
+  </script>
+
+</body>
+</html>
+

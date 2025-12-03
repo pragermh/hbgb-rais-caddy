@@ -19,13 +19,18 @@
       line-height: 1.5;
       text-align: center;
     }
+
     h1 {
       font-family: 'Montserrat', sans-serif;
       font-weight: 700;
       font-size: 2.5rem;
       margin-bottom: 1rem;
     }
-    #subTitle { font-size: 1.5rem; color: #ccc; }
+
+    #subTitle {
+      font-size: 1.5rem;
+      color: #ccc;
+    }
 
     #openseadragon {
       width: 90vw;
@@ -42,7 +47,7 @@
 
     .dl-bar {
       display: flex;
-      gap: .75rem;
+      gap: 0.75rem;
       justify-content: center;
       align-items: center;
       margin: 0 auto 2rem;
@@ -52,18 +57,27 @@
 
     .btn {
       display: inline-block;
-      padding: .65rem 1rem;
+      padding: 0.65rem 1rem;
       border: 2px solid #4CAF50;
       color: #4CAF50;
       background: transparent;
       border-radius: 6px;
       cursor: pointer;
-      transition: transform .05s ease, background-color .2s ease, color .2s ease;
+      transition: opacity 0.2s ease, background-color 0.2s ease, color 0.2s ease;
       font-weight: 700;
-      letter-spacing: .2px;
+      text-decoration: none;
+      letter-spacing: 0.2px;
     }
-    .btn:hover { background-color: #4CAF50; color: #000; transform: translateY(-1px); }
-    .btn:active { transform: translateY(0); }
+
+    .btn:hover {
+      background-color: #4CAF50;
+      color: #000;
+    }
+
+    .btn[data-busy="1"] {
+      opacity: 0.6;
+      cursor: default;
+    }
 
     .error-box {
       background: rgba(255, 0, 0, 0.12);
@@ -76,22 +90,27 @@
       font-size: 1.2rem;
     }
 
-    footer { margin-top: 3rem; font-size: .9rem; color: #777; font-style: italic; }
+    footer {
+      margin-top: 3rem;
+      font-size: 0.9rem;
+      color: #777;
+      font-style: italic;
+    }
   </style>
 </head>
+
 <body>
 
-  <h1 id="pageTitle">
+  <h1>
     Herbarium GB Image Viewer<br>
     <span id="subTitle"></span>
   </h1>
 
   <div id="openseadragon"></div>
 
-  <!-- Download buttons -->
   <div class="dl-bar" id="dlBar" style="display:none;">
-    <button id="dlSmall" class="btn">⬇ Small JPEG</button>
-    <button id="dlFull"  class="btn">⬇ Large JPEG</button>
+    <button id="dlSmall" class="btn" type="button">⬇ Small JPEG</button>
+    <button id="dlFull" class="btn" type="button">⬇ Large JPEG</button>
   </div>
 
   <footer>
@@ -99,80 +118,71 @@
   </footer>
 
   <script>
-    // ----- Constants -----
     const $ = id => document.getElementById(id);
     const IIIF_ROOT = '/iiif';
     const SHARD_PREFIX_LEN = 7;
+    const DOWNLOAD_DURATION_MS = 3000;
 
-    // ID parsing
     const pathId = location.pathname.replace(/^\/+|\/+$/g, '');
     const hasId = !!pathId;
     const isValidGbId = id => /^GB-\d{7}$/.test(id);
 
-    // ----- UI helpers -----
-    const setSubtitle = text => { $('subTitle').textContent = text; };
+    const setSubtitle = text => {
+      $('subTitle').textContent = text;
+    };
+
     const clearViewer = () => {
       $('openseadragon').innerHTML = "";
       $('dlBar').style.display = 'none';
     };
 
-    // ----- Error-display inside viewer -----
+    const attachDownloadButton = (btnId, url, filename) => {
+      const btn = $(btnId);
+      if (!btn) return;
+
+      btn.addEventListener('click', () => {
+        if (btn.dataset.busy === '1') return;
+
+        const originalText = btn.textContent;
+        btn.dataset.busy = '1';
+        btn.textContent = 'Downloading…';
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        setTimeout(() => {
+          btn.dataset.busy = '0';
+          btn.textContent = originalText;
+        }, DOWNLOAD_DURATION_MS);
+      });
+    };
+
     const showError = (code, id) => {
       clearViewer();
 
-      const config = {
-        no_id: {
-          title: "No Image ID Provided",
-          message: "No QR code or specimen ID was given in the address."
-        },
-        invalid_id: {
-          title: "Invalid Image ID",
-          message: id
-            ? `“${id}” is not a valid Herbarium GB image ID.`
-            : "The supplied value is not a valid Herbarium GB image ID."
-        },
-        id_not_found: {
-          title: "Image Not Found",
-          message: id
-            ? `No image could be found for ID “${id}”.`
-            : "The requested image does not exist."
-        },
-        rais_down: {
-          title: "Image Server Unavailable",
-          message: "The RAIS image server is currently offline or unreachable."
-        },
-        system: {
-          title: "Viewer Service Unavailable",
-          message: "The viewer encountered an unexpected error."
-        }
+      const messages = {
+        no_id: ["No Image ID Provided", "No QR code or specimen ID was given in the address."],
+        invalid_id: ["Invalid Image ID", id ? `“${id}” is not a valid Herbarium GB image ID.` : "Invalid ID."],
+        id_not_found: ["Image Not Found", id ? `No image could be found for ID “${id}”.` : "Not found."],
+        rais_down: ["Image Server Unavailable", "The RAIS image server is offline."],
+        system: ["Viewer Service Unavailable", "Unexpected viewer error."]
       };
 
-      const cfg = config[code] || config.system;
+      const [title, msg] = messages[code] || messages.system;
 
-      setSubtitle(cfg.title);
+      setSubtitle(title);
+
       const box = document.createElement('div');
       box.className = 'error-box';
-      box.textContent = cfg.message;
+      box.textContent = msg;
       $('openseadragon').appendChild(box);
     };
 
-    // ----- Downloads -----
-    async function downloadViaBlob(url, filename) {
-      try {
-        const r = await fetch(url, { cache: 'no-store' });
-        if (!r.ok) throw new Error(`Download failed ${r.status}`);
-        const blob = await r.blob();
-        const tmp = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = tmp; a.download = filename;
-        document.body.appendChild(a); a.click(); a.remove();
-        URL.revokeObjectURL(tmp);
-      } catch (e) {
-        console.error('Download error', e);
-      }
-    }
-
-    // ----- Flow -----
     if (!hasId) {
       showError('no_id');
     } else if (!isValidGbId(pathId)) {
@@ -183,58 +193,22 @@
 
       (async () => {
         try {
-          // Lookup index shard
           const shard = imageId.slice(0, SHARD_PREFIX_LEN);
           const idxUrl = `/idx/${shard}.json`;
 
-          let resp;
-          try {
-            resp = await fetch(idxUrl, { cache: 'force-cache' });
-          } catch (e) {
-            console.error("Index fetch failed", e);
-            showError('system', imageId);
-            return;
-          }
-
-          if (!resp.ok) {
-            if (resp.status === 404) {
-              showError('id_not_found', imageId);
-              return;
-            }
-            showError('system', imageId);
-            return;
-          }
+          const resp = await fetch(idxUrl, { cache: 'force-cache' });
+          if (!resp.ok) return showError('id_not_found', imageId);
 
           const map = await resp.json();
           const rel = map[imageId];
-          if (!rel) {
-            showError('id_not_found', imageId);
-            return;
-          }
+          if (!rel) return showError('id_not_found', imageId);
 
           const jp2Base = `${IIIF_ROOT}/${rel}/${imageId}.jp2`;
           const infoUrl = `${jp2Base}/info.json`;
 
-          // HEAD check for IIIF availability
-          try {
-            const headResp = await fetch(infoUrl, { method: 'HEAD', cache: 'no-store' });
+          const headResp = await fetch(infoUrl, { method: 'HEAD', cache: 'no-store' });
+          if (!headResp.ok) return showError('rais_down', imageId);
 
-            if (!headResp.ok) {
-              if (headResp.status === 404) {
-                showError('id_not_found', imageId);
-                return;
-              }
-              console.error("IIIF backend error:", headResp.status);
-              showError('rais_down', imageId);
-              return;
-            }
-          } catch (e) {
-            console.error('HEAD info.json failed', e);
-            showError('rais_down', imageId);
-            return;
-          }
-
-          // Initialize viewer
           OpenSeadragon({
             id: 'openseadragon',
             prefixUrl: 'https://cdnjs.cloudflare.com/ajax/libs/openseadragon/4.0.0/images/',
@@ -242,21 +216,18 @@
             navigatorPosition: 'BOTTOM_RIGHT',
             crossOriginPolicy: 'Anonymous',
             tileSources: infoUrl
-          }).addHandler('open-failed', () => {
-            showError('id_not_found', imageId);
           });
 
-          // Download buttons
           const smallUrl = `${jp2Base}/full/1200,/0/default.jpg`;
-          const fullUrl  = `${jp2Base}/full/full/0/default.jpg`;
+          const fullUrl = `${jp2Base}/full/full/0/default.jpg`;
 
-          $('dlSmall').onclick = () => downloadViaBlob(smallUrl, `${imageId}-small.jpg`);
-          $('dlFull').onclick  = () => downloadViaBlob(fullUrl,  `${imageId}-large.jpg`);
+          attachDownloadButton('dlSmall', smallUrl, `${imageId}-small.jpg`);
+          attachDownloadButton('dlFull', fullUrl, `${imageId}-large.jpg`);
 
           $('dlBar').style.display = 'flex';
 
         } catch (e) {
-          console.error("Viewer flow failed", e);
+          console.error(e);
           showError('system', pathId);
         }
       })();

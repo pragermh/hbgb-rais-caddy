@@ -47,3 +47,14 @@ rebuild:
 # Show running containers
 ps:
 	$(DC) ps
+
+# ----------------------------------------------
+# Shard generation + sync
+# ----------------------------------------------
+
+# Generate shards for main viewer and copy to test viewer
+shards:
+	python3 path-finder.py
+	mkdir -p webroot2/idx
+	cp -r webroot/idx/* webroot2/idx/
+	echo "Shards generated and copied to webroot2/"

@@ -3,7 +3,7 @@
     # email you@example.com
 }
 
-botmus-dev.it.gu.se {
+{$HOST} {
     root * /srv
     encode gzip
 
@@ -50,7 +50,7 @@ botmus-dev.it.gu.se {
     }
 }
 
-botnode.it.gu.se {
+{$HOST2} {
     root * /srv2
     encode gzip
 

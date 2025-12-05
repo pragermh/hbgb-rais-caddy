@@ -156,7 +156,7 @@ and map those in docker-compose:
       - "8080:80"
       - "8443:443"
 
-This still allows automatic HTTPS, as long as public traffic on 80/443 reaches
+This still allows automatic HTTPS (see below), as long as public traffic on 80/443 reaches
 container ports 80/443 via the forwarding.
 
 If you run Docker/Podman as root (or use a system-level service), you can instead
@@ -165,6 +165,14 @@ bind ports directly:
     ports:
       - "80:80"
       - "443:443"
+
+### Automatic HTTPS
+
+Caddy automatically obtains and renews TLS certificates (via ACME/Let's Encrypt) for the hostnames defined in `.env` (`HOST` and `HOST2`). This works as long as:
+
+- The values are valid domain names (without ports)
+- Public ports 80 and 443 reach the Caddy container (directly or via port forwarding)
+- DNS for each hostname points to this server
 
 ### Health checks
 

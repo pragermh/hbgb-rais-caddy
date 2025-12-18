@@ -196,7 +196,7 @@
           const shard = imageId.slice(0, SHARD_PREFIX_LEN);
           const idxUrl = `/idx/${shard}.json`;
 
-          const resp = await fetch(idxUrl, { cache: 'force-cache' });
+          const resp = await fetch(idxUrl, { cache: 'no-cache' });
           if (!resp.ok) return showError('id_not_found', imageId);
 
           const map = await resp.json();
